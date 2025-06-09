@@ -47,11 +47,13 @@ const userSchema=new Schema({
     }
 },{timestamps:true})
 
-userSchema.pre("save",async function (next) {
 
-    if(!this.isModified("password")) return next();
+//type of mongoose Pre middleware hook which helps , before saving user it checks if the pass is modified  
+userSchema.pre("save",async function (next) { 
 
-    this.password=bcrypt.hash(this.password,8);
+    if(!this.isModified("password")) return next();  //checks if password ismodified 
+
+    this.password=await bcrypt.hash(this.password,8);
     next()
 })
 
