@@ -4,103 +4,229 @@ import { ApiError } from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { User } from "../models/user.model.js";
 import { uploadOnCloudinary } from "../utils/cloudinary.js";
+import jwt from "jsonwebtoken"
+import { act, use } from "react";
+// Utility to generate tokens
+const generateRefreshAndAccessToken = async (userId) => {
+  try {
+    const user = await User.findById(userId);
+    const accessToken = user.generateAccessToken();
+    const refreshToken = user.generateRefreshToken();
 
+    user.refreshToken = refreshToken;
+    await user.save({ validateBeforeSave: false });
+
+    return { accessToken, refreshToken };
+  } catch (error) {
+    throw new ApiError(
+      500,
+      [],
+      "Something went wrong while generating refresh and access token"
+    );
+  }
+};
+
+// REGISTER USER
 const registerUser = asyncHandler(async (req, res) => {
-  // Zod schema
   const requiredBody = z.object({
-    username: z
-      .string()
+    username: z.string()
       .trim()
       .min(3, "Username must be at least 3 characters")
       .max(20, "Username must be at most 20 characters")
       .regex(/^[a-zA-Z_]+$/, "Username must only contain letters and underscores"),
-    email: z
-      .string()
+    email: z.string()
       .trim()
       .toLowerCase()
       .min(8)
       .max(70)
       .regex(/^[^\s@]+@[^\s@]+\.[^\s@]+$/, "Invalid email format"),
-    fullName: z
-      .string()
+    fullName: z.string()
       .trim()
       .min(4)
       .max(30)
       .regex(/^[a-zA-Z\s]+$/, "Fullname must only contain letters and spaces"),
-    password: z
-      .string()
+    password: z.string()
       .min(6)
       .max(100)
       .regex(/[0-9]/, "Must contain at least one digit")
       .regex(/[A-Z]/, "Must contain at least one uppercase letter")
-      .regex(/[$&+,:;=?@#|'<>.^*()%!-]/, "Must contain at least one special character")
+      .regex(/[$&+,:;=?@#|'<>.^*()%!-]/, "Must contain at least one special character"),
   });
 
   const validatedData = requiredBody.safeParse(req.body);
   if (!validatedData.success) {
     return res.status(400).json({
-      message: "Invalid Data format",
+      message: "Invalid registration data format",
       error: validatedData.error.issues,
     });
   }
 
-  try {
-    const { email, fullName, username, password } = validatedData.data;
+  const { email, fullName, username, password } = validatedData.data;
 
-    const existedUser = await User.findOne({
-      $or: [{ username }, { email }],
-    });
+  const existedUser = await User.findOne({
+    $or: [{ username }, { email }],
+  });
 
-    if (existedUser) {
-      throw new ApiError(409, "User with email or username already exists");
-    }
-
-    // ✅ Access files
-    const avatarLocalPath = req.files?.avatar?.[0]?.path;
-    // const coverImageLocalPath = req.files?.coverImage?.[0]?.path;
-
-    let coverImageLocalPath;
-    if(req.files && Array.isArray(req.files.coverImage) && req.files.coverImage.length>0){
-      coverImageLocalPath=req.files.coverImage[0].path
-    }
-
-    if (!avatarLocalPath) {
-      throw new ApiError(400, "Avatar file is required");
-    }
-
-    // ✅ Upload to Cloudinary
-    const avatar = await uploadOnCloudinary(avatarLocalPath);
-    const coverImage = coverImageLocalPath ? await uploadOnCloudinary(coverImageLocalPath) : null;
-
-    if (!avatar || !avatar.url) {
-      throw new ApiError(400, "Failed to upload avatar");
-    }
-
-    // ✅ Save user to DB
-    const user = await User.create({
-      email,
-      fullName,
-      username: username.toLowerCase(), 
-      password,
-      avatar: avatar.url,
-      coverImage: coverImage?.url || "",
-    });
-
-    const createdUser = await User.findById(user._id).select("-password -refreshToken");
-    if (!createdUser) {
-      throw new ApiError(500, "Something went wrong while registering user");
-    }
-
-    return res.status(201).json(
-      new ApiResponse(200, createdUser, "User Registered Successfully")
-    );
-  } catch (error) {
-    console.error("Register Error:", error);
-    return res.status(error.statusCode || 500).json({
-      message: error.message || "Internal Server Error",
-      ...(error.error && { error: error.error })
-    });
+  if (existedUser) {
+    throw new ApiError(409, [], "User with email or username already exists");
   }
+
+  const avatarLocalPath = req.files?.avatar?.[0]?.path;
+  let coverImageLocalPath;
+  if (req.files?.coverImage?.length > 0) {
+    coverImageLocalPath = req.files.coverImage[0].path;
+  }
+
+  if (!avatarLocalPath) {
+    throw new ApiError(400, [], "Avatar file is required");
+  }
+
+  const avatar = await uploadOnCloudinary(avatarLocalPath);
+  const coverImage = coverImageLocalPath
+    ? await uploadOnCloudinary(coverImageLocalPath)
+    : null;
+
+  if (!avatar || !avatar.url) {
+    throw new ApiError(400, [], "Failed to upload avatar");
+  }
+
+  const user = await User.create({
+    email,
+    fullName,
+    username: username.toLowerCase(),
+    password,
+    avatar: avatar.url,
+    coverImage: coverImage?.url || "",
+  });
+
+  const createdUser = await User.findById(user._id).select("-password -refreshToken");
+  if (!createdUser) {
+    throw new ApiError(500, [], "Something went wrong while registering user");
+  }
+
+  return res.status(201).json(
+    new ApiResponse(200, createdUser, "User Registered Successfully")
+  );
 });
 
-export { registerUser };
+// LOGIN USER
+const loginUser = asyncHandler(async (req, res) => {
+  const requiredBodyLogin = z.object({
+    email: z.string()
+      .trim()
+      .toLowerCase()
+      .min(8)
+      .max(70)
+      .regex(/^[^\s@]+@[^\s@]+\.[^\s@]+$/, "Invalid email format"),
+    password: z.string()
+      .min(6)
+      .max(100)
+      .regex(/[0-9]/, "Must contain at least one digit")
+      .regex(/[A-Z]/, "Must contain at least one uppercase letter")
+      .regex(/[$&+,:;=?@#|'<>.^*()%!-]/, "Must contain at least one special character"),
+  });
+
+  const validatedData = requiredBodyLogin.safeParse(req.body);
+  if (!validatedData.success) {
+    return res.status(400).json({
+      message: "Invalid login data format",
+      error: validatedData.error.issues,
+    });
+  }
+
+  const { email, password } = validatedData.data;
+
+  const userExists = await User.findOne({ email });
+
+  if (!userExists) {
+    throw new ApiError(404, [], "User does not exist");
+  }
+
+  const isPassValid = await userExists.isPasswordCorrect(password);
+  if (!isPassValid) {
+    throw new ApiError(401, [], "Invalid email or password");
+  }
+
+  const { refreshToken, accessToken } = await generateRefreshAndAccessToken(userExists._id);
+
+  const loggedInUser = await User.findById(userExists._id)
+    .select("-password -refreshToken");
+
+  const options = {
+    httpOnly: true,
+    secure: true,
+  };
+
+  return res
+    .status(200)
+    .cookie("accessToken", accessToken, options)
+    .cookie("refreshToken", refreshToken, options)
+    .json(
+      new ApiResponse(
+        200,
+        {
+          user: loggedInUser,
+          accessToken,
+          refreshToken,
+        },
+        "User Logged In Successfully"
+      )
+    );
+});
+
+// LOGOUT USER
+const logoutUser = asyncHandler(async (req, res) => {
+  await User.findByIdAndUpdate(req.user._id, {
+    $unset: { refreshToken: 1 },
+  });
+
+  const options = {
+    httpOnly: true,
+    secure: true,
+  };
+
+  return res
+    .status(200)
+    .clearCookie("accessToken", options)
+    .clearCookie("refreshToken", options)
+    .json(new ApiResponse(200, {}, "User Logged Out"));
+});
+//////////////////Refreshing Access Token
+
+const refreshAccessToken=asyncHandler=(async(req,res)=>{
+
+  const incomingRefreshToken=req.cookies.refreshToken || req.body.refreshToken
+  if(incomingRefreshToken){
+    throw new ApiError(401,"Unauthorized request")
+  }
+  try {
+    const decodedToken=jwt.verify(incomingRefreshToken,process.env.REFRESH_TOKEN_SECRET)
+  
+    const user =await User.findById(decodedToken?._id)
+    if(!user){
+      throw new ApiError(401,"Invalid Refresh Token")
+    }
+    if(incomingRefreshToken !== user?.refreshToken){
+      throw new ApiError(401,"Refresh Token is expired or used")
+    }
+      const options={
+        httpOnly:true,
+        secure:true
+      }
+     const{accessToken,newRefreshToken}= await generateRefreshAndAccessToken(user._id)
+      return res.status(200)
+      .cookie("accessToken",accessToken,options)
+      .cookie("refreshToken",newRefreshToken,options)
+      .json(
+        new ApiResponse(
+          200,
+          {accessToken, refreshToken:newRefreshToken},
+          "Access Token Refreshed"
+        )
+      )
+  } catch (error) {
+    throw new ApiError(401,error?.message || "Invalid Refresh Token")
+  }
+})
+
+export { registerUser, loginUser, logoutUser,refreshAccessToken };
