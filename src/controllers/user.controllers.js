@@ -228,7 +228,7 @@ const logoutUser = asyncHandler(async (req, res) => {
 });
 //////////////////Refreshing Access Token
 
-const refreshAccessToken = (asyncHandler = async (req, res) => {
+const refreshAccessToken = asyncHandler (async (req, res) => {
   const incomingRefreshToken =
     req.cookies.refreshToken || req.body.refreshToken;
   if (!incomingRefreshToken) {
@@ -319,31 +319,67 @@ const changeCurrentPassword = asyncHandler(async (req, res) => {
     .status(200)
     .json(new ApiResponse(200, {}, "Password Changed Successfully"));
 });
+//---
 const getCurrentUser = asyncHandler(async (req, res) => {
   return res
     .status(200)
     .json(new ApiResponse(200, req.user, "Current User fetched Successfully"));
 });
 
+
 const updateAccountDetails = asyncHandler(async (req, res) => {
-  const { email, fullName } = req.body;
-  if (!(email || fullName)) {
-    throw new ApiError(400, "All fields are required");
+  // Zod schema
+  const updateUserSchema = z.object({
+    email: z
+      .string()
+      .email("Invalid email format")
+      .optional()
+      .or(z.literal("")), // allow empty string if frontend sends it
+    fullName: z
+      .string()
+      .min(1, "Full name must be at least 1 character")
+      .max(100, "Full name must be less than 100 characters")
+      .optional()
+      .or(z.literal("")), // allow empty string if frontend sends it
+  });
+
+  // Validate request body
+  const validated = updateUserSchema.safeParse(req.body);
+
+  if (!validated.success) {
+    return res.status(400).json({
+      message: "Invalid data format",
+      error: validated.error.issues,
+    });
   }
+
+  const { email, fullName } = validated.data;
+
+  // Check if both are missing or empty
+  if (!email && !fullName) {
+    throw new ApiError(400, "At least one field (email or full name) is required");
+  }
+
+  // Construct dynamic update object
+  const updateData = {};
+  if (email) updateData.email = email;
+  if (fullName) updateData.fullName = fullName;
+
   const user = await User.findByIdAndUpdate(
     req.user?._id,
-    {
-      $set: {
-        fullName: fullName,
-        email: email,
-      },
-    },
-    { new: true }.select("-password")
+    { $set: updateData },
+    { new: true, runValidators: true }
+  ).select("-password");
+
+  if (!user) {
+    throw new ApiError(404, "User not found");
+  }
+
+  return res.status(200).json(
+    new ApiResponse(200, user, "Account details updated successfully")
   );
-  return res
-    .status(200)
-    .json(new ApiResponse(200, user, "Account details updated Successfully"));
 });
+
 
 const updateUserAvatar = asyncHandler(async (req, res) => {
   const avatarLocalPath = req.file?.path;
@@ -479,11 +515,12 @@ const getUserChannelProfile = asyncHandler(async (req, res) => {
 });
 
 const getWatchHistory = asyncHandler(async (req, res) => {
+
   const user = await User.aggregate([
     {
       $match: {
-        _id: new mongoose.Types.ObjectId(req.userId),
-      },
+        _id: new mongoose.Types.ObjectId(req.user._id),
+      }
     },
     {
       $lookup: {
@@ -520,8 +557,9 @@ const getWatchHistory = asyncHandler(async (req, res) => {
         ],
       },
     },
+   
   ]);
-
+  
   return res
   .status(200)
   .json(new ApiResponse(200, user[0].watchHistory,"Watch history fetched Successfully"))
