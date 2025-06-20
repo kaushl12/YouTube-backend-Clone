@@ -1,4 +1,4 @@
-import mongoose, { model, Schema, Types } from "mongoose";
+import mongoose, {  Schema } from "mongoose";
 import mongooseAggreagtePaginate from "mongoose-aggreagte-paginate-v2"
 const videoSchema = new Schema(
   {
