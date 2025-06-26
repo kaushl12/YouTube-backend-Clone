@@ -19,14 +19,14 @@ app.use(cookieParser());
 // Routes
 import userRouter from "./routes/user.routes.js";
 import videoRouter from "./routes/video.routes.js";
+import commentRouter from "./routes/comment.routes.js";
+import communityPostRouter from "./routes/communityPost.routes.js";
 app.use("/api/v1/users", userRouter);
 app.use("/api/v1/videos", videoRouter);
+app.use("/api/v1/comments", commentRouter);
+app.use("/api/v1/communityPost", communityPostRouter);
 
 app.use((err, req, res, next) => {
-  const statusCode = err.statusCode || 500;
-  const message = err.message || "Internal Server Error";
-  const errors = err.errors || [];
-
   res.status(err.statusCode || 500).json({
   success: false,
   message: err.message || "Internal Server Error",
