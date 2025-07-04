@@ -104,20 +104,16 @@ const publishVideo = asyncHandler(async (req, res) => {
     owner: new mongoose.Types.ObjectId(userId),
   };
 
-  // ✅ Add title filter if provided
   if (query) {
     filter.title = { $regex: query, $options: "i" };
   }
 
-  // ✅ Sorting
   const sortOption = {};
   sortOption[sortBy] = sortType === "asc" ? 1 : -1;
 
-  // ✅ Count matching documents
   const totalVideos = await Video.countDocuments(filter);
   const totalPages = Math.ceil(totalVideos / limitNumber);
 
-  // ✅ Fetch data
   const videos = await Video.find(filter)
     .sort(sortOption)
     .skip(skip)
@@ -280,7 +276,42 @@ const togglePublishStatus = asyncHandler(async (req, res) => {
         `Video has been ${video.isPublished ? "published" : "unpublished"} successfully`
       )
     );
+
+
 });
+
+const watchVideo = asyncHandler(async (req, res) => {
+  const { videoId } = req.params;
+  const userId = req.user._id;
+
+  if (!mongoose.Types.ObjectId.isValid(videoId)) {
+    throw new ApiError(400, "Invalid video ID");
+  }
+
+  const video = await Video.findById(videoId);
+  if (!video) {
+    throw new ApiError(404, "Video not found");
+  }
+
+  video.views += 1;
+  await video.save();
+
+  
+  await User.findByIdAndUpdate(
+    userId,
+    { $addToSet: { watchHistory: videoId } }, 
+    { new: true } 
+  );
+
+  return res.status(200).json(
+    new ApiResponse(200, {
+      videoId: video._id,
+      updatedViews: video.views,
+      watchHistoryUpdated: true
+    }, "Video watched and added to history")
+  );
+});
+
 
 export {
   publishVideo,
@@ -289,4 +320,5 @@ export {
   updateVideo,
   deleteVideo,
   togglePublishStatus,
+  watchVideo
 };
