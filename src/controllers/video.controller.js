@@ -88,18 +88,15 @@ const publishVideo = asyncHandler(async (req, res) => {
     throw new ApiError(400, [], "userId is required");
   }
 
-  // ✅ Ensure user exists
   const existedUser = await User.findById(userId);
   if (!existedUser) {
     throw new ApiError(404, [], "User not found");
   }
 
-  // ✅ Convert types
   const pageNumber = parseInt(page, 10);
   const limitNumber = parseInt(limit, 10);
   const skip = (pageNumber - 1) * limitNumber;
 
-  // ✅ Convert userId to ObjectId
   const filter = {
     owner: new mongoose.Types.ObjectId(userId),
   };

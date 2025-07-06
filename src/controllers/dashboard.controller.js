@@ -9,16 +9,14 @@ import { User } from "../models/user.model.js";
 
 const getChannelStats = asyncHandler(async (req, res) => {
   // TODO: Get the channel stats like=total video views, total subscribers, total videos, total likes etc.
-  const { channelId } = req.params;
-  if (!mongoose.Types.ObjectId.isValid(channelId)) {
-    throw new ApiError(400, "Invalid video ID format");
-  }
-  const channelObjectId = new mongoose.Types.ObjectId(channelId);
+  const channelObjectId  = req.user._id;
+  
+  
+  
   const totalSubscribers = await Subscription.countDocuments({
     channel: channelObjectId,
   });
 
-  // ✅ Get all videos of this channel
   const videos = await Video.find({ owner: channelObjectId }).select(
     "_id views"
   );
@@ -28,7 +26,7 @@ const getChannelStats = asyncHandler(async (req, res) => {
   const totalVideos = videos.length;
   const totalViews = videos.reduce((acc, video) => acc + video.views, 0);
   const videoIds = videos.map((video) => video._id);
-
+  
   const totalLikes = await Like.countDocuments({
     video: { $in: videoIds },
   });
