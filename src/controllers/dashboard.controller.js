@@ -54,7 +54,7 @@ const getChannelStats = asyncHandler(async (req, res) => {
 
 const getChannelVideos = asyncHandler(async (req, res) => {
   // TODO: Get all the videos uploaded by the channel
-  const { channelId } = req.params;
+  const { channelId } = req.user._id;
 
   if (!mongoose.Types.ObjectId.isValid(channelId)) {
     throw new ApiError(400, "Invalid Channel ID format");
