@@ -42,14 +42,14 @@ app.use("/api/v1/health", healthRoutes);
 
 
 
-app.use((err, req, res, next) => {
-  res.status(err.statusCode || 500).json({
-  success: false,
-  message: err.message || "Internal Server Error",
-  errors: err.errors || [],
-  statusCode: err.statusCode || 500,
-    stack: process.env.NODE_ENV === "development" ? err.stack : undefined,
+  app.use((err, req, res, next) => {
+    res.status(err.statusCode || 500).json({
+    success: false,
+    message: err.message || "Internal Server Error",
+    errors: err.errors || [],
+    statusCode: err.statusCode || 500,
+      stack: process.env.NODE_ENV === "development" ? err.stack : undefined,
+    });
   });
-});
 
-export { app };
+  export { app };

@@ -1,8 +1,9 @@
-import express from 'express'
 import connectDB from './db/index.js'
 import dotenv from "dotenv"
 
 import {app} from './app.js'
+import mongoose from 'mongoose'
+import { error, log } from 'console';
             
 dotenv.config({
     path:'./.env'
@@ -35,3 +36,5 @@ connectDB()
         throw err
     }
 })()*/
+
+

@@ -201,9 +201,10 @@ const updateVideo = asyncHandler(async (req, res) => {
   const duration = Math.floor(videoFileUpload?.duration || 0);
 
   // Delete old cloudinary files if they exist
-  if (video.videoFile?.public_id) {
-    await deleteFromCloudinary(video.videoFile.public_id);
-  }
+if (video.videoFile?.public_id) {
+  await deleteFromCloudinary(video.videoFile.public_id, "video");
+}
+
   if (video.thumbnail?.public_id) {
     await deleteFromCloudinary(video.thumbnail.public_id);
   }
