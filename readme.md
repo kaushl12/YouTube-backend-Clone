@@ -51,6 +51,7 @@ cp .env.example .env
 
 # Start the server
 npm run dev
+
 📄 API Documentation
 A Postman collection is included in the repository for easy testing.
 
