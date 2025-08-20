@@ -56,4 +56,5 @@ npm run dev
 A Postman collection is included in the repository for easy testing.
 
 🏆 Why This Project?
-This project is not just CRUD — it implements real-world backend logic, optimized queries, and production-ready code structure, making it ideal for portfolio and job applications.
+This project is not just CRUD — it implements real-world backend logic, optimized queries, and production-ready code structure, making it ideal for portfolio and job applications. 
+https://web.postman.co/workspace/My-Workspace~22875a19-7baa-41b3-813f-b74a352b68ed/collection/32566538-06d4ba18-d71b-408d-a2d9-e96d48675127?action=share&source=copy-link&creator=32566538
